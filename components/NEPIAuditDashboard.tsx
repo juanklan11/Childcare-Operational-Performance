@@ -16,7 +16,6 @@ const InfoPill: React.FC<{ icon?: React.ReactNode; label: string; value: string 
 export default function NEPIAuditDashboard() {
   const [activeTab] = useState("overview");
 
-  // mock annuals for now
   const annuals = useMemo(() => {
     const elec = 91200;
     const water = 1000;
@@ -48,10 +47,16 @@ export default function NEPIAuditDashboard() {
       <section className="mx-auto max-w-7xl px-6 pb-2 pt-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="rounded-3xl border bg-white p-6 shadow-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="rounded-3xl border bg-white p-6 shadow-sm"
+            >
               <h1 className="text-2xl font-semibold tracking-tight">Executive Summary</h1>
               <p className="mt-2 text-slate-600">
-                NABERS Energy Performance Indicator (Childcare) intake status, evidence readiness, and early performance KPIs for energy, water, waste, and IEQ.
+                NABERS Energy Performance Indicator (Childcare) intake status, evidence readiness, and early performance KPIs for
+                energy, water, waste, and IEQ.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
                 <InfoPill icon={<FileText className="h-4 w-4" />} label="Evidence readiness" value={`${pctComplete()}%`} />
