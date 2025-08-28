@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Leaf, Droplet, BarChart3 } from "lucide-react";
-import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Area, Line, Legend, Tooltip as ReTooltip } from "recharts";
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Area, Line, Legend, Tooltip as ReTooltip, Bar } from "recharts";
 
 const months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 const energySeries = months.map((m,i)=>({
@@ -11,6 +11,11 @@ const energySeries = months.map((m,i)=>({
   pv_gen_kwh:[1200,1300,1500,1600,1700,1800,1800,1700,1500,1300,1200,1100][i]
 }));
 const waterSeries = months.map((m,i)=>({ month:m, water_kl:[80,76,74,78,82,85,88,92,96,90,86,82][i]}));
+const wasteSeries = months.map((m,i)=>({
+  month:m,
+  waste_total_kg:[1200,1150,1100,1080,1120,1180,1250,1300,1350,1280,1220,1180][i],
+  recycle_pct:[38,40,41,42,43,41,39,40,42,43,44,45][i]
+}));
 
 export default function ParentSnapshot(){
   const annuals = React.useMemo(()=>{
@@ -38,7 +43,7 @@ export default function ParentSnapshot(){
       <main className="mx-auto max-w-6xl px-6 py-8">
         <div className="rounded-3xl border bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-semibold tracking-tight">At-a-glance</h1>
-          <p className="mt-1 text-sm text-slate-600">This page shares high-level energy and water information for our centre. Detailed evidence lives on our private dashboard.</p>
+          <p className="mt-1 text-sm text-slate-600">This page shares high-level energy, water, and waste information for our centre. Detailed evidence lives on our private dashboard.</p>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div className="rounded-2xl border bg-slate-50 p-4"><div className="text-xs text-slate-500">Annual electricity</div><div className="flex items-center gap-2 text-lg font-semibold"><BarChart3 className="h-4 w-4"/>{annuals.elec.toLocaleString()} kWh</div></div>
             <div className="rounded-2xl border bg-slate-50 p-4"><div className="text-xs text-slate-500">PV generation</div><div className="text-lg font-semibold">{annuals.pv.toLocaleString()} kWh</div></div>
@@ -47,7 +52,7 @@ export default function ParentSnapshot(){
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="rounded-3xl">
             <CardHeader><CardTitle>Electricity & Solar</CardTitle></CardHeader>
             <CardContent className="h-72">
@@ -65,6 +70,7 @@ export default function ParentSnapshot(){
               <div className="mt-2 text-[11px] italic text-slate-500">Source: Utility bills & inverter logs (12 months)</div>
             </CardContent>
           </Card>
+
           <Card className="rounded-3xl">
             <CardHeader><CardTitle>Water</CardTitle></CardHeader>
             <CardContent className="h-72">
@@ -79,6 +85,25 @@ export default function ParentSnapshot(){
                 </ComposedChart>
               </ResponsiveContainer>
               <div className="mt-2 text-[11px] italic text-slate-500">Source: Water bills (12 months)</div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl">
+            <CardHeader><CardTitle>Waste & Recycling</CardTitle></CardHeader>
+            <CardContent className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={wasteSeries} margin={{ top:10,right:20,bottom:0,left:-10 }}>
+                  <CartesianGrid strokeDasharray="3 3"/>
+                  <XAxis dataKey="month"/>
+                  <YAxis yAxisId="left" orientation="left"/>
+                  <YAxis yAxisId="right" orientation="right" domain={[0,100]}/>
+                  <ReTooltip/>
+                  <Bar yAxisId="left" dataKey="waste_total_kg" name="Total waste (kg)" fill="#94a3b8" radius={[8,8,0,0]}/>
+                  <Line yAxisId="right" type="monotone" dataKey="recycle_pct" name="Recycling rate (%)" stroke="#10b981" strokeWidth={2} dot/>
+                  <Legend/>
+                </ComposedChart>
+              </ResponsiveContainer>
+              <div className="mt-2 text-[11px] italic text-slate-500">Source: Waste invoices & collector reports (12 months)</div>
             </CardContent>
           </Card>
         </div>
