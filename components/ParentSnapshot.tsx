@@ -7,8 +7,8 @@ import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Area, 
 const months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 const energySeries = months.map((m,i)=>({
   month:m,
-  electricity_kwh:[8200,7900,7600,7300,7000,7200,7800,8400,9000,9500,9100,8700][i],
-  pv_gen_kwh:[1200,1300,1500,1600,1700,1800,1800,1700,1500,1300,1200,1100][i]
+  electricity_kwh: [8200, 8400, 8600, 8800, 8600, 8200, 8000, 8500, 9300, 9800, 9500, 9000][i],
+  pv_gen_kwh:      [1700, 1400, 1000, 1050, 1250, 1550, 1850, 2050, 2250, 2350, 2150, 1850][i]
 }));
 const waterSeries = months.map((m,i)=>({ month:m, water_kl:[80,76,74,78,82,85,88,92,96,90,86,82][i]}));
 const wasteSeries = months.map((m,i)=>({
