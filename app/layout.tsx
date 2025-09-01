@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "NABERS Childcare dashboard and public snapshot",
 };
 
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
