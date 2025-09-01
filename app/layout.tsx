@@ -1,12 +1,13 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { SpeedInsights } from "next";
 
 export const metadata: Metadata = {
   title: "Childcare Energy – NEPI",
   description: "NABERS Childcare dashboard and public snapshot",
 };
 
-import { SpeedInsights } from "@vercel/speed-insights/next";
+
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
