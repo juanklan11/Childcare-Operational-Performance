@@ -1,114 +1,57 @@
+// /app/api/providers/route.ts
 import { NextResponse } from "next/server";
-import path from "path";
-import { readFile } from "fs/promises";
+import { providers as SEED, type Provider } from "@/data/providers";
 
-type Row = Record<string, string>;
+// Optional: ISR-style cache hint for static hosting
+export const revalidate = 3600; // seconds
 
-function splitCSVLine(line: string): string[] {
-  // Split on commas not inside double-quotes
-  const re = /,(?=(?:[^"]*"[^"]*")*[^"]*$)/g;
-  return line
-    .split(re)
-    .map((s) => s.trim().replace(/^"|"$/g, "")); // trim + strip outer quotes
+type SortKey = "size" | "need" | "name";
+
+function withPriority(p: Provider) {
+  const score = p.audit_need_score ?? 0;
+  const priority = score >= 75 ? "High" : score >= 50 ? "Medium" : "Low";
+  return { ...p, priority };
 }
 
-function parseCSV(text: string): Row[] {
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines.length === 0) return [];
-  const headers = splitCSVLine(lines[0]).map((h) => h.trim());
-  return lines.slice(1).map((ln) => {
-    const cols = splitCSVLine(ln);
-    const obj: Row = {};
-    headers.forEach((h, i) => (obj[h] = cols[i] ?? ""));
-    return obj;
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const sort = (searchParams.get("sort") as SortKey) || "size"; // size | need | name
+  const min = Number(searchParams.get("minServices") ?? 0);
+  const state = searchParams.get("state"); // NSW,VIC,...
+  const q = (searchParams.get("q") || "").toLowerCase();
+
+  // Base filter
+  let rows = SEED
+    .map(withPriority)
+    .filter((p) => (p.services ?? 0) >= min)
+    .filter((p) => (state ? (p.states || []).includes(state as any) : true))
+    .filter((p) => (q ? p.name.toLowerCase().includes(q) : true));
+
+  // Sorting
+  rows.sort((a, b) => {
+    if (sort === "need") {
+      return (b.audit_need_score - a.audit_need_score) || ((b.services ?? 0) - (a.services ?? 0)) || a.name.localeCompare(b.name);
+    }
+    if (sort === "name") {
+      return a.name.localeCompare(b.name);
+    }
+    // default: size
+    return ((b.services ?? 0) - (a.services ?? 0)) || (b.audit_need_score - a.audit_need_score) || a.name.localeCompare(b.name);
   });
-}
 
-function findKey(obj: Row, guesses: string[]): string | undefined {
-  const keys = Object.keys(obj).map((k) => k.toLowerCase());
-  for (const g of guesses) {
-    const i = keys.findIndex((k) => k === g || k.includes(g));
-    if (i >= 0) return Object.keys(obj)[i];
-  }
-}
-
-function bandAuditNeed(services: number) {
-  if (services >= 200) return "Very High";
-  if (services >= 100) return "High";
-  if (services >= 30)  return "Medium";
-  return "Low";
-}
-
-async function readChildcareCSV(): Promise<{ rows: Row[]; source: string }> {
-  const candidates = [
-    "public/data/childcare-centres.csv",
-    "app/public/data/childcare-centres.csv", // fallback if file still in /app
-  ];
-  let lastErr: any;
-  for (const rel of candidates) {
-    try {
-      const p = path.join(process.cwd(), rel);
-      const txt = await readFile(p, "utf8");
-      return { rows: parseCSV(txt), source: rel };
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw new Error(`CSV not found in ${candidates.join(" or ")}. Last error: ${String(lastErr)}`);
-}
-
-export async function GET() {
-  try {
-    const { rows, source } = await readChildcareCSV();
-    if (!rows.length) return NextResponse.json({ rows: [], note: "CSV empty", source });
-
-    // detect columns
-    const pk = findKey(rows[0], ["provider", "operator", "approvedprovider", "serviceprovider"])!;
-    const sk = findKey(rows[0], ["service", "servicename", "name"])!;
-    const addrK = findKey(rows[0], ["address", "street", "location"]) ?? "";
-    const stateK = findKey(rows[0], ["state", "st"]) ?? "";
-
-    if (!pk || !sk) {
-      return NextResponse.json(
-        { error: "Missing required columns (provider/service). Check CSV headers.", headers: Object.keys(rows[0]), source },
-        { status: 400 },
-      );
-    }
-
-    // aggregate by provider
-    const map = new Map<
-      string,
-      { provider: string; services: number; states: Set<string>; sample: { name: string; address?: string }[] }
-    >();
-
-    for (const r of rows) {
-      const provider = (r[pk] || "").trim();
-      const svc = (r[sk] || "").trim();
-      if (!provider || !svc) continue;
-      if (!map.has(provider)) map.set(provider, { provider, services: 0, states: new Set(), sample: [] });
-      const agg = map.get(provider)!;
-      agg.services += 1;
-      if (stateK && r[stateK]) agg.states.add((r[stateK] || "").trim());
-      if (agg.sample.length < 3) agg.sample.push({ name: svc, address: addrK ? r[addrK] : undefined });
-    }
-
-    const providers = Array.from(map.values())
-      .map((p) => ({
-        provider: p.provider,
-        services: p.services,
-        states: Array.from(p.states).sort(),
-        audit_need: bandAuditNeed(p.services),
-        sampleCentres: p.sample,
-      }))
-      .sort((a, b) => b.services - a.services);
-
-    return NextResponse.json({
+  return NextResponse.json(
+    {
+      count: rows.length,
+      sort,
+      filters: { minServices: min, state: state || null, q: q || null },
       updatedAt: new Date().toISOString(),
-      source,
-      count: providers.length,
-      rows: providers,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || String(e) }, { status: 500 });
-  }
+      providers: rows
+    },
+    {
+      headers: {
+        // Cached at the edge, revalidated transparently
+        "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400"
+      }
+    }
+  );
 }
