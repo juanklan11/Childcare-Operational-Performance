@@ -1,105 +1,83 @@
 import { NextResponse } from "next/server";
+import fs from "fs/promises";
+import path from "path";
 
-type VicRecord = {
-  _id?: number;
-  ref?: string;
-  name?: string;
-  contact_ph?: string;
-  url?: string;
-  coordinates?: string; // "-37.79, 144.91"
-};
+// Minimal CSV parser that copes with quoted commas
+function parseCSV(text: string): Record<string, string>[] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0]
+    .replace(/^\uFEFF/, "") // strip BOM if present
+    .split(",")
+    .map((h) => h.trim());
 
-type LeadRow = {
-  serviceName: string;
-  provider: string;
-  address: string;
-  lat?: number;
-  lng?: number;
-};
+  return lines.slice(1).map((line) => {
+    const cells: string[] = [];
+    let buf = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          buf += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === "," && !inQuotes) {
+        cells.push(buf);
+        buf = "";
+      } else {
+        buf += ch;
+      }
+    }
+    cells.push(buf);
 
-function parseCoords(s?: string) {
-  if (!s) return {};
-  const [latStr, lngStr] = s.split(",").map((v) => v.trim());
-  const lat = Number(latStr);
-  const lng = Number(lngStr);
-  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : {};
+    const row: Record<string, string> = {};
+    headers.forEach((h, idx) => (row[h] = (cells[idx] ?? "").trim()));
+    return row;
+  });
+}
+
+// Map whatever columns the CSV has into the table shape the UI expects
+function toLeadRow(r: Record<string, string>) {
+  const serviceName =
+    r.serviceName || r.Service || r.service || r.name || r.Name || "";
+  const provider =
+    r.provider || r.Provider || r.organisation || r.org || r.contact_ph || "";
+  const address =
+    r.address || r.Address || r.coordinates || r.suburb || r.town || "";
+  return { serviceName, provider, address };
 }
 
 export async function GET(req: Request) {
-  const base = process.env.VIC_DATA_BASE || "https://discover.data.vic.gov.au/api/3/action/datastore_search";
-  const resource = process.env.VIC_RESOURCE_ID;
-  const apiKey = process.env.VIC_API_KEY;
-
-  if (!resource) {
-    // Fall back to the existing mock when not configured
-    return NextResponse.json({
-      rows: [
-        { serviceName: "Little Explorers ELC", provider: "Allaf Property Group", address: "8–10 Mailey St, Sunshine West VIC" },
-        { serviceName: "Riverbank Early Learning", provider: "Kinder Co.", address: "25 Princes Hwy, Werribee VIC" },
-        { serviceName: "Bayview Kids", provider: "Coastal ELC Pty Ltd", address: "10 Nepean Hwy, Frankston VIC" }
-      ],
-      note: "No VIC_RESOURCE_ID set; serving mock rows."
-    });
-  }
-
-  // Allow simple query and limit (optional)
-  const url = new URL(base);
-  url.searchParams.set("resource_id", resource);
-  const reqUrl = new URL(req.url);
-  const limit = reqUrl.searchParams.get("limit") || "50";
-  const q = reqUrl.searchParams.get("q") || "";
-  url.searchParams.set("limit", limit);
-  if (q) url.searchParams.set("q", q);
-
-  const headers: Record<string, string> = { "Accept": "application/json" };
-  if (apiKey) {
-    // Cover common CKAN auth headers; most instances accept at least one of these.
-    headers["Authorization"] = apiKey;
-    headers["X-CKAN-API-Key"] = apiKey;
-    headers["X-API-KEY"] = apiKey;
-  }
+  const { searchParams } = new URL(req.url);
+  const limit = parseInt(searchParams.get("limit") || "25", 10);
 
   try {
-    const r = await fetch(url.toString(), { headers, cache: "no-store" });
-    if (!r.ok) throw new Error(`Upstream ${r.status}`);
-    const data = await r.json();
-
-    const recs: VicRecord[] = data?.result?.records || [];
-
-    const rows: LeadRow[] = recs.map((rec) => {
-      // Provider: pull host from URL if present; otherwise phone/name fallback
-      let provider = "";
-      try {
-        if (rec.url) provider = new URL(rec.url).hostname.replace(/^www\./, "");
-      } catch { /* ignore bad URLs */ }
-      if (!provider) provider = rec.contact_ph || "—";
-
-      const { lat, lng } = parseCoords(rec.coordinates);
-
-      return {
-        serviceName: rec.name || "—",
-        provider,
-        address: lat && lng ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : "—",
-        lat,
-        lng
-      };
-    });
+    const filePath = path.join(
+      process.cwd(),
+      "public",
+      "data",
+      "childcare-centres.csv"
+    );
+    const csv = await fs.readFile(filePath, "utf8");
+    const raw = parseCSV(csv);
+    const rows = raw.map(toLeadRow).filter((r) => r.serviceName).slice(0, limit);
 
     return NextResponse.json({
       rows,
-      source: "Data.Vic CKAN datastore_search",
-      resource_id: resource,
-      total: data?.result?.total ?? rows.length
+      note: "Loaded from /public/data/childcare-centres.csv",
     });
-  } catch (e: any) {
-    // Graceful fallback with note
+  } catch (err: any) {
     return NextResponse.json(
       {
         rows: [],
-        error: `Fetch failed: ${e?.message || e}`,
-        note: "Check env vars and that the API is reachable from Vercel."
+        error: err.message,
+        note:
+          "CSV not found or unreadable. Ensure /public/data/childcare-centres.csv exists in the repo.",
       },
-      { status: 502 }
+      { status: 500 }
     );
   }
 }
