@@ -1,39 +1,72 @@
+// app/api/leads/route.ts
 import { NextResponse } from "next/server";
 
-const CKAN_BASE = "https://data.gov.au/data/api/3/action/datastore_search";
-const RESOURCE_ID = process.env.DGAU_CHILDCARE_RESOURCE_ID; // e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+type Row = { serviceName: string; provider: string; address: string };
+
+const mockRows: Row[] = [
+  { serviceName: "Little Explorers ELC", provider: "Allaf Property Group", address: "8–10 Mailey St, Sunshine West VIC" },
+  { serviceName: "Riverbank Early Learning", provider: "Kinder Co.", address: "25 Princes Hwy, Werribee VIC" },
+  { serviceName: "Bayview Kids", provider: "Coastal ELC Pty Ltd", address: "10 Nepean Hwy, Frankston VIC" },
+];
 
 export async function GET(req: Request) {
-  if (!RESOURCE_ID) {
-    return NextResponse.json({ error: "Missing DGAU_CHILDCARE_RESOURCE_ID" }, { status: 500 });
+  const url = new URL(req.url);
+  const q = url.searchParams.get("q") || ""; // optional search term
+  const resource = process.env.DATA_GOV_RESOURCE_ID; // e.g. a CKAN resource UUID
+  const base =
+    process.env.DATA_GOV_BASE ||
+    "https://data.gov.au/data/api/3/action/datastore_search";
+  const apiKey = process.env.DATA_GOV_API_KEY; // optional
+
+  if (!resource) {
+    return NextResponse.json({
+      rows: mockRows,
+      note: "No DATA_GOV_RESOURCE_ID set; serving mock rows.",
+    });
   }
-  const { searchParams } = new URL(req.url);
-  const postcode = (searchParams.get("postcode") || "").trim();
-  const limit = Number(searchParams.get("limit") || 100);
 
-  // Basic CKAN query by postcode; adjust "postcode" to the column name used by your chosen dataset
-  const url = `${CKAN_BASE}?resource_id=${RESOURCE_ID}&limit=${limit}` +
-              (postcode ? `&q=${encodeURIComponent(JSON.stringify({ postcode }))}` : "");
+  try {
+    // Basic CKAN datastore_search query; adjust fields once you know the schema
+    const endpoint = `${base}?resource_id=${resource}&limit=25${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+    const res = await fetch(endpoint, {
+      headers: apiKey ? { "X-API-KEY": apiKey } : {},
+      // cache one hour; tweak as needed
+      next: { revalidate: 3600 },
+    });
 
-  const r = await fetch(url, { headers: { Accept: "application/json" }, next: { revalidate: 86400 } }); // cache 24h
-  if (!r.ok) return NextResponse.json({ error: "Upstream error" }, { status: 502 });
-  const json = await r.json();
-  const rows = json?.result?.records || [];
+    if (!res.ok) throw new Error(`Upstream ${res.status}`);
 
-  // Normalise a few likely fields; adjust mapping once you pick the dataset
-  const data = rows.map((row: any) => ({
-    serviceName: row.service_name || row.name || row.ServiceName,
-    provider: row.provider || row.ProviderName,
-    address: [row.address_1 || row.Address1, row.suburb || row.Suburb, row.state || row.State, row.postcode || row.Postcode].filter(Boolean).join(", "),
-    suburb: row.suburb || row.Suburb,
-    state: row.state || row.State,
-    postcode: row.postcode || row.Postcode,
-    approvedPlaces: row.approved_places || row.ApprovedPlaces,
-    nqsRating: row.nqs_rating || row.NQS || null,
-    lat: row.latitude || row.Latitude,
-    lon: row.longitude || row.Longitude,
-  }));
+    const data = await res.json();
+    const records = data?.result?.records || [];
 
-  return NextResponse.json({ rows: data });
+    const rows: Row[] = records
+      .map((r: any) => ({
+        // Map these defensively — different datasets use different keys
+        serviceName:
+          r.service_name || r.ServiceName || r.service || r.name || "",
+        provider:
+          r.approved_provider_name ||
+          r.Provider ||
+          r.provider_name ||
+          r.operator ||
+          "",
+        address: [
+          r.address_line_1 || r.Address1 || r.address,
+          r.suburb || r.Locality,
+          r.state || r.State,
+          r.postcode || r.Postcode,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      }))
+      .filter((r: Row) => r.serviceName || r.provider || r.address);
+
+    return NextResponse.json({ rows });
+  } catch (err: any) {
+    return NextResponse.json(
+      { rows: mockRows, error: String(err) },
+      { status: 200 }
+    );
+  }
 }
 
