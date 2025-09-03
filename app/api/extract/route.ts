@@ -2,18 +2,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRequire } from "module";
 
-export const runtime = "nodejs";           // pdf-parse needs Node, not Edge
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type LoadedFile = { buf: Buffer; type: string; filename: string };
 
-// ---------- helpers ---------------------------------------------------------
+// ---------------- helpers ----------------
 
 async function loadFromMultipart(req: NextRequest): Promise<LoadedFile | null> {
   const ct = req.headers.get("content-type") || "";
   if (!ct.includes("multipart/form-data")) return null;
-
   const form = await req.formData();
   const file = form.get("file") as File | null;
   const url = (form.get("url") || form.get("blobUrl"))?.toString();
@@ -27,22 +26,22 @@ async function loadFromMultipart(req: NextRequest): Promise<LoadedFile | null> {
     };
   }
 
-  if (url) return await loadFromUrl(url);
+  if (url) return loadFromUrl(url);
   return null;
 }
 
 async function loadFromJson(req: NextRequest): Promise<LoadedFile | null> {
   const ct = req.headers.get("content-type") || "";
   if (!ct.includes("application/json")) return null;
-  const body = await req.json().catch(() => null) as null | { url?: string };
-  if (body?.url) return await loadFromUrl(body.url);
+  const body = (await req.json().catch(() => null)) as null | { url?: string };
+  if (body?.url) return loadFromUrl(body.url);
   return null;
 }
 
 async function loadFromQuery(req: NextRequest): Promise<LoadedFile | null> {
   const url = new URL(req.url).searchParams.get("url");
   if (!url) return null;
-  return await loadFromUrl(url);
+  return loadFromUrl(url);
 }
 
 async function loadFromUrl(url: string): Promise<LoadedFile> {
@@ -69,36 +68,62 @@ function extractKeyInfo(text: string) {
   };
 }
 
-// ---------- route -----------------------------------------------------------
+// PDF.js fallback for image/text-shy PDFs
+async function extractWithPdfJs(buf: Buffer): Promise<string> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // Node usage doesn't need a worker
+  const loadingTask = (pdfjs as any).getDocument({ data: buf });
+  const pdf = await loadingTask.promise;
+
+  let text = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // join all string items found on the page
+    text += content.items.map((it: any) => (it.str || "")).join(" ") + "\n";
+  }
+  return text;
+}
+
+// ---------------- route ----------------
 
 export async function POST(req: NextRequest) {
   try {
-    // Resolve a file from: multipart, JSON {url}, or ?url=
-    const loaded =
+    // Accept: multipart (preferred), JSON {url}, or GET ?url=
+    const load =
       (await loadFromMultipart(req)) ||
       (await loadFromJson(req)) ||
       (await loadFromQuery(req));
 
-    if (!loaded) {
+    if (!load) {
       return NextResponse.json(
-        { ok: false, error: "No file provided. Upload a file or pass a ?url= (Blob URL) to this endpoint." },
+        { ok: false, error: "No file provided. Upload a file or pass a ?url= to this endpoint." },
         { status: 400 }
       );
     }
 
-    const { buf, type, filename } = loaded;
-
+    const { buf, type, filename } = load;
     let text = "";
     const lower = filename.toLowerCase();
 
     if (type.includes("pdf") || lower.endsWith(".pdf")) {
-      // Require at runtime so Next never bundles pdf-parse (prevents ENOENT)
+      // 1) try pdf-parse (runtime require so Next doesn’t bundle it)
       const require = createRequire(import.meta.url);
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
-      const parsed = await pdfParse(buf);
-      text = (parsed?.text || "").slice(0, 200_000);
-    } else if (type.includes("csv") || lower.endsWith(".csv") || type.includes("text")) {
+      let parsed: { text: string } | null = null;
+      try {
+        parsed = await pdfParse(buf);
+      } catch {
+        // ignore and go to fallback
+      }
+      text = (parsed?.text || "").trim();
+
+      // 2) Fallback to PDF.js if very little/none found
+      if (!text || text.length < 50) {
+        const fallback = await extractWithPdfJs(buf).catch(() => "");
+        if (fallback && fallback.length > text.length) text = fallback.trim();
+      }
+    } else if (type.includes("csv") || lower.endsWith(".csv") || type.includes("text") || lower.endsWith(".txt")) {
       text = buf.toString("utf8");
     } else {
       return NextResponse.json({
@@ -108,12 +133,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const keyInfo = extractKeyInfo(text);
+    const preview = (text || "").slice(0, 4000);
+    const keyInfo = extractKeyInfo(text || "");
 
     return NextResponse.json({
       ok: true,
       meta: { filename, contentType: type, size: buf.length },
-      preview: text.slice(0, 4000),
+      preview,
+      previewChars: preview.length,
       keyInfo,
     });
   } catch (err: any) {
@@ -122,6 +149,5 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // Support GET /api/extract?url=...
   return POST(req);
 }
