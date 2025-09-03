@@ -1,12 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Keep any options you already had; add the block below:
   experimental: {
-    // Prevent Next from bundling pdf-parse (which makes it look for local test files)
-    serverComponentsExternalPackages: ['pdf-parse'],
+    // Keep both external so Next doesn't bundle them (which can break on Vercel)
+    serverComponentsExternalPackages: ['pdf-parse', 'pdfjs-dist'],
   },
-
-  // Optional but harmless: ensures we stay on Node APIs at build time
+  // Standalone output keeps the server environment predictable for Node libs
   output: 'standalone',
 };
 
