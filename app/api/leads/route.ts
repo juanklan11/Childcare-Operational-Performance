@@ -1,38 +1,45 @@
-// app/api/leads/route.ts
 import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
 import path from "path";
+import fs from "fs/promises";
 
-// tiny CSV parser that respects simple quoted values
-function parseCSV(text: string) {
+type LeadRow = {
+  ref: string;
+  name: string;
+  contact_ph?: string;
+  url?: string;
+  coordinates?: string;
+};
+
+function parseCsv(text: string): LeadRow[] {
   const lines = text.trim().split(/\r?\n/);
-  const headers = lines[0].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(h => h.replace(/^"|"$/g, "").trim());
-  return lines.slice(1).map(line => {
-    const cols = line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c => c.replace(/^"|"$/g, "").trim());
-    const row: Record<string,string> = {};
-    headers.forEach((h, i) => { row[h] = cols[i] ?? ""; });
-    return row;
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim());
+
+  return lines.slice(1).map((ln) => {
+    const cells = ln.split(",").map((c) => c.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => (row[h] = cells[i] ?? ""));
+    // normalise keys to what the UI expects
+    return {
+      ref: row.ref || "",
+      name: row.name || "",
+      contact_ph: row.contact_ph || "",
+      url: row.url || "",
+      coordinates: row.coordinates || "",
+    };
   });
 }
 
 export async function GET() {
   try {
     const filePath = path.join(process.cwd(), "public", "data", "childcare-centres.csv");
-    const csv = await readFile(filePath, "utf8");
-    const rows = parseCSV(csv);
-
-    // map common header names → UI fields
-    const mapped = rows.map((r, i) => ({
-      serviceName: r.serviceName || r.service || r.name || `Service ${i + 1}`,
-      provider:    r.provider    || r.organisation || r.operator || r.owner || "",
-      address:     r.address     || r.location || r.coordinates || "",
-    }));
-
-    return NextResponse.json({ rows: mapped });
-  } catch (err) {
+    const csv = await fs.readFile(filePath, "utf8");
+    const rows = parseCsv(csv);
+    return NextResponse.json({ rows, note: "Loaded from /public/data/childcare-centres.csv" });
+  } catch (err: any) {
     return NextResponse.json(
-      { rows: [], note: "CSV not found or unreadable at /public/data/childcare-centres.csv" },
-      { status: 200 }
+      { rows: [], error: err?.message ?? String(err) },
+      { status: 500 }
     );
   }
 }
