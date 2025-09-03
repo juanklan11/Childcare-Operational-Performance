@@ -1,172 +1,130 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+"use client";
 
-// Server Action — simple credential gate just for /auditor
-async function signIn(formData: FormData) {
-  "use server";
-  const u = String(formData.get("user") || "");
-  const p = String(formData.get("pass") || "");
-  const U = process.env.AUDITOR_USER || "auditor";
-  const P = process.env.AUDITOR_PASS || "auditor123";
+import Image from "next/image";
+import React from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-  if (u === U && p === P) {
-    cookies().set("auditor_auth", "ok", { httpOnly: true, sameSite: "lax", path: "/" });
-    redirect("/auditor");
-  }
-  // If invalid, just return (page will re-render showing an error hint)
-}
+export default function AuditorPage() {
+  const [tab, setTab] = React.useState("method");
 
-export default async function AuditorPage({
-  searchParams,
-}: {
-  searchParams?: Record<string, string | string[] | undefined>;
-}) {
-  const authed = cookies().get("auditor_auth")?.value === "ok";
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white text-slate-900">
-        {/* Header with logo */}
-        <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <img src="/lid-logo.svg" alt="LID Consulting" className="h-8 w-auto" />
-              <div>
-                <div className="text-sm font-semibold tracking-tight text-emerald-800">LID Consulting</div>
-                <div className="text-xs text-slate-500">Auditor Sign-in</div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-md px-6 py-12">
-          <h1 className="text-2xl font-semibold tracking-tight text-emerald-900">Auditor area</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Enter the credentials for the Auditor workspace. This sign-in is separate from the client dashboard basic auth.
-          </p>
-
-          <form action={signIn} className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-            <label className="block text-sm">
-              <span className="text-slate-600">Username</span>
-              <input
-                name="user"
-                required
-                className="mt-1 w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="auditor"
-                autoComplete="username"
-              />
-            </label>
-            <label className="mt-4 block text-sm">
-              <span className="text-slate-600">Password</span>
-              <input
-                name="pass"
-                type="password"
-                required
-                className="mt-1 w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
-            </label>
-            <button
-              type="submit"
-              className="mt-6 w-full rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
-            >
-              Sign in
-            </button>
-            <p className="mt-3 text-xs text-slate-500">
-              Set <code>AUDITOR_USER</code> / <code>AUDITOR_PASS</code> in Vercel → Settings → Environment Variables.
-            </p>
-          </form>
-        </main>
-      </div>
-    );
-  }
-
-  // ===== Authenticated Auditor Workspace =====
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white text-slate-900">
-      {/* Header with logo */}
-      <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src="/lid-logo.svg" alt="LID Consulting" className="h-8 w-auto" />
-            <div>
-              <div className="text-sm font-semibold tracking-tight text-emerald-800">LID Consulting</div>
-              <div className="text-xs text-slate-500">Auditor Workspace</div>
-            </div>
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      {/* Simple brand row (no event handlers in props) */}
+      <header className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image src="/lid-logo.svg" alt="LID Consulting" width={36} height={36} className="h-9 w-9" />
+          <div>
+            <div className="text-sm font-semibold tracking-tight">Auditor Workspace</div>
+            <div className="text-xs text-slate-500">NEPI methodology & required documentation</div>
           </div>
         </div>
+        <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700">
+          Private
+        </span>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-emerald-900">Audit Methodology & Required Documentation</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Use this checklist to feed the sustainability dashboard (NEPI Energy Performance Indicator — Childcare).
-        </p>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="method">Methodology</TabsTrigger>
+          <TabsTrigger value="docs">Required Documentation</TabsTrigger>
+          <TabsTrigger value="dashboard">Data → Dashboard Mapping</TabsTrigger>
+        </TabsList>
 
-        {/* Methodology */}
-        <section className="mt-6 rounded-3xl border bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold tracking-tight">Methodology (A → G)</h2>
-          <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-slate-700">
-            <li><strong>A. Inception</strong> — Kickoff, scope, site selection, inductions.</li>
-            <li><strong>B. Data request</strong> — Issue audit data sheet & evidence checklist.</li>
-            <li><strong>C. Desktop review</strong> — Validate bills, meters (NMI/MIRN), drawings.</li>
-            <li><strong>D. Site visit</strong> — Inspect HVAC, PV/inverters, meters, ventilation; interview ops team.</li>
-            <li><strong>E. Analysis</strong> — Build baseline (kWh, MJ, kL, kg), PV coverage, IEQ summary.</li>
-            <li><strong>F. Initial results</strong> — Present preliminary findings & gaps.</li>
-            <li><strong>G. Final report & dashboard</strong> — Deliver audit report + populated dashboard.</li>
-          </ol>
-        </section>
+        <TabsContent value="method">
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold tracking-tight">Audit methodology</h2>
+            <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-slate-700">
+              <li>Confirm site boundary, rated area method, and operating hours (20%/80% markers).</li>
+              <li>Collect 12 months of bills for electricity, gas/diesel (if any), and water.</li>
+              <li>Verify meters (NMI/MIRN), sub-meter coverage, and PV inverter logs where applicable.</li>
+              <li>Capture waste stream invoices & lifts; note contamination and service frequency.</li>
+              <li>Record IEQ measurements (e.g., CO₂ steady-state & 95th percentile per room).</li>
+              <li>Evidence chain: drawings, schedules, contracts, calculations, and photos as needed.</li>
+            </ol>
+            <p className="mt-3 text-xs text-slate-500">Aligned to NABERS Energy Performance Indicator (Childcare) — The Rules v1.3.</p>
+          </section>
+        </TabsContent>
 
-        {/* Required Docs */}
-        <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">Evidence — Energy & Water</h3>
-            <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-700">
-              <li>12 months electricity & gas bills (PDF/CSV); tariff pages highlighted.</li>
-              <li>PV inverter generation logs (CSV/API) and single line diagram.</li>
-              <li>Water bills (12 months) & reticulation diagram (if available).</li>
-              <li>Non-utility meters (sub-meter IDs, locations, channels).</li>
-            </ul>
-          </div>
-          <div className="rounded-3xl border bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">Evidence — Waste & IEQ</h3>
-            <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-700">
-              <li>Monthly waste invoices; stream volumes & contamination notes.</li>
-              <li>IEQ data (CO₂ by room — median / 95th percentile if available).</li>
-              <li>Operating hours, 20% arrival & 80% departure times + exceptions.</li>
-              <li>Rated area method and drawings (BOMA/lettable/GFA; marked plans).</li>
-            </ul>
-          </div>
-        </section>
+        <TabsContent value="docs">
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold tracking-tight">Required documentation</h2>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border p-4">
+                <div className="text-sm font-medium">Energy</div>
+                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
+                  <li>Electricity &amp; gas/diesel bills (12 months)</li>
+                  <li>PV generation report or inverter export</li>
+                  <li>Sub-meter list and data source</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="text-sm font-medium">Water</div>
+                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
+                  <li>Potable &amp; recycled water bills (12 months)</li>
+                  <li>Reticulation diagram &amp; non-utility meters</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="text-sm font-medium">Waste</div>
+                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
+                  <li>Invoices per stream and service frequency</li>
+                  <li>Contamination notes &amp; photos (if any)</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="text-sm font-medium">IEQ</div>
+                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
+                  <li>CO₂ by room — median &amp; 95th percentile</li>
+                  <li>Ventilation/controls strategy notes</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+        </TabsContent>
 
-        {/* Delivery */}
-        <section className="mt-6 rounded-3xl border bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold">Delivery & Handover</h3>
-          <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-slate-700">
-            <li>Draft findings within 4 days of site visit; final report 7 days after feedback.</li>
-            <li>Dashboard updated with baselines: electricity, gas, PV, water, waste, IEQ.</li>
-            <li>Recommendations with priority & payback; evidence gaps tracked to closure.</li>
-          </ul>
-        </section>
-      </main>
-
-      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs text-slate-500">
-        <div className="flex items-center justify-between border-t pt-4">
-          <div>© {new Date().getFullYear()} LID Consulting — Auditor Workspace</div>
-          <form
-            action={async () => {
-              "use server";
-              cookies().delete("auditor_auth");
-              redirect("/auditor");
-            }}
-          >
-            <button className="rounded-lg border px-3 py-1.5 hover:bg-slate-100" type="submit">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </footer>
-    </div>
+        <TabsContent value="dashboard">
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold tracking-tight">Dashboard mapping</h2>
+            <p className="mt-2 text-sm text-slate-700">
+              Auditors’ uploads feed structured collections that drive the private client dashboard and the public
+              parent snapshot. When evidence is marked <em>Complete</em>, KPIs update automatically.
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500">
+                    <th className="py-2 pr-4">Collection</th>
+                    <th className="py-2 pr-4">Fields</th>
+                    <th className="py-2 pr-4">Populates</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t">
+                    <td className="py-2 pr-4 font-medium">Energy bills</td>
+                    <td className="py-2 pr-4">period, kWh, MJ, cost, NMI/MIRN</td>
+                    <td className="py-2 pr-4">Energy charts &amp; annual totals</td>
+                  </tr>
+                  <tr className="border-t">
+                    <td className="py-2 pr-4 font-medium">Water bills</td>
+                    <td className="py-2 pr-4">period, kL, cost, meter</td>
+                    <td className="py-2 pr-4">Water chart &amp; annual total</td>
+                  </tr>
+                  <tr className="border-t">
+                    <td className="py-2 pr-4 font-medium">Waste</td>
+                    <td className="py-2 pr-4">stream, kg, lifts, contamination</td>
+                    <td className="py-2 pr-4">Waste chart &amp; recycling rate</td>
+                  </tr>
+                  <tr className="border-t">
+                    <td className="py-2 pr-4 font-medium">IEQ (CO₂)</td>
+                    <td className="py-2 pr-4">room, median, p95</td>
+                    <td className="py-2 pr-4">IEQ room chart • targets</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </TabsContent>
+      </Tabs>
+    </main>
   );
 }
