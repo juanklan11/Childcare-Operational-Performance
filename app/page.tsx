@@ -1,76 +1,59 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export default function HomePage() {
+export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
-      {/* Top brand bar */}
-      <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100">
-              {/* Logo (no event handlers passed) */}
-              <Image
-                src="/lid-logo.svg"
-                alt="LID Consulting"
-                width={20}
-                height={20}
-                className="h-5 w-5"
-                priority
-              />
-            </div>
-            <div>
-              <div className="text-sm font-semibold tracking-tight">LID Consulting</div>
-              <div className="text-xs text-slate-500">Childcare Environmental Performance</div>
-            </div>
+    <main className="mx-auto max-w-6xl px-6 py-12">
+      {/* Simple brand row (no event handlers anywhere) */}
+      <header className="mb-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/lid-logo.svg"
+            alt="LID Consulting"
+            width={40}
+            height={40}
+            className="h-10 w-10"
+            priority
+          />
+          <div>
+            <div className="text-lg font-semibold tracking-tight">LID Consulting</div>
+            <div className="text-xs text-slate-500">Childcare Energy • ESD • Assurance</div>
           </div>
-          <nav className="hidden items-center gap-3 md:flex text-sm">
-            <Link className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100" href="/snapshot">
-              Parent Snapshot
-            </Link>
-            <Link className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100" href="/dashboard">
-              Client Dashboard
-            </Link>
-            <Link className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100" href="/providers">
-              Providers
-            </Link>
-            <Link className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100" href="/leads">
-              Leads
-            </Link>
-          </nav>
         </div>
+        <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700">
+          Demo / Proof of Concept
+        </span>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-10">
-        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-          <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-          Proof of Concept
-        </span>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Reduce OPEX, demonstrate quality (NQS 3 & 7), and meet sustainability disclosure — purpose-built for childcare operators & designers.
+      <section className="rounded-3xl border bg-white p-8 shadow-sm">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Reduce OPEX, strengthen NQS compliance, and publish credible sustainability metrics.
         </h1>
-        <p className="mt-3 text-slate-600">
-          We baseline Environmental Performance for Childcare and turn it into operating savings, compliance support,
-          and credible disclosures. Your portfolio gets a verified dashboard (private) and a simple, parent-friendly snapshot (public).
+        <p className="mt-3 max-w-3xl text-slate-700">
+          We help <strong>Operators</strong> cut energy and water costs through NABERS-aligned tuning and quick-win
+          retrofits, while supporting <strong>NQS Quality Areas 3 & 7</strong> with clear evidence trails, policies, and
+          governance. Designers benefit from ESD-ready DA packs that reduce rework, de-risk approvals, and embed
+          passively efficient layouts. Outcomes can be exported for <strong>sustainability reporting</strong> and investor/parent
+          disclosure.
         </p>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500">Lower OPEX</div>
-            <p className="mt-1 text-sm text-slate-700">
-              8–15% energy savings via controls tuning, HVAC/LED upgrades & tariff optimisation — improved $/place and margin resilience.
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border p-5">
+            <div className="text-sm font-semibold">OPEX reduction</div>
+            <p className="mt-1 text-sm text-slate-600">
+              HVAC tuning, LED upgrades, tariff optimisation and sub-metering to capture 10–20% savings in many centres.
             </p>
           </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500">NQS Criteria 3 & 7</div>
-            <p className="mt-1 text-sm text-slate-700">
-              Facilities (3) & governance/leadership (7) supported with evidence-ready processes, IEQ targets and maintenance actions.
+          <div className="rounded-2xl border p-5">
+            <div className="text-sm font-semibold">NQS 3 & 7 support</div>
+            <p className="mt-1 text-sm text-slate-600">
+              Evidence-first dashboards help demonstrate well-maintained facilities (QA3) and strong leadership/governance (QA7).
             </p>
           </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500">Environmental disclosure</div>
-            <p className="mt-1 text-sm text-slate-700">
-              Audit-ready dataset aligned with emerging AASB/ASRS expectations — reproducible emissions & boundary methodology.
+          <div className="rounded-2xl border p-5">
+            <div className="text-sm font-semibold">Environmental disclosure</div>
+            <p className="mt-1 text-sm text-slate-600">
+              Publish verified energy, water, waste, and IEQ metrics for transparency with parents and stakeholders.
             </p>
           </div>
         </div>
@@ -79,50 +62,46 @@ export default function HomePage() {
           {/* Public */}
           <Link
             href="/snapshot"
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-white shadow-sm hover:bg-emerald-700"
+            className="rounded-xl border bg-white px-4 py-2 text-sm shadow-sm hover:bg-slate-50"
           >
-            View Parent Snapshot (public)
+            Parent Snapshot (public)
           </Link>
 
-          {/* Private (basic auth) */}
+          {/* Client (basic auth) */}
           <Link
             href="/dashboard"
-            className="rounded-xl border bg-white px-4 py-2 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-50"
+            className="rounded-xl border bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
           >
-            Open Client Dashboard (private)
+            Client Dashboard (private)
           </Link>
 
-          {/* Admin (basic auth for providers & leads) */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/providers"
-              className="rounded-xl border bg-white px-4 py-2 text-slate-700 hover:bg-slate-50"
-            >
-              Admin: Providers
-            </Link>
-            <Link
-              href="/leads"
-              className="rounded-xl border bg-white px-4 py-2 text-slate-700 hover:bg-slate-50"
-            >
-              Admin: Leads
-            </Link>
-          </div>
+          {/* Auditor (separate basic auth; link only) */}
+          <Link
+            href="/auditor"
+            className="rounded-xl border bg-white px-4 py-2 text-sm shadow-sm hover:bg-slate-50"
+          >
+            Auditor Workspace (private)
+          </Link>
+
+          {/* Admin for leads/providers */}
+          <Link
+            href="/leads"
+            className="rounded-xl border bg-white px-4 py-2 text-sm shadow-sm hover:bg-slate-50"
+          >
+            Admin: Leads
+          </Link>
+          <Link
+            href="/providers"
+            className="rounded-xl border bg-white px-4 py-2 text-sm shadow-sm hover:bg-slate-50"
+          >
+            Admin: Providers
+          </Link>
         </div>
 
-        <p className="mt-4 text-xs text-slate-500">
-          Note: The Dashboard and Admin pages are protected by basic authentication (set <code>DASH_USER/DASH_PASS</code> and{" "}
-          <code>ADMIN_USER/ADMIN_PASS</code> in your environment; see middleware).
-        </p>
-      </main>
-
-      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs text-slate-500">
-        <div className="flex flex-col items-start justify-between gap-3 border-t pt-4 md:flex-row md:items-center">
-          <div>© {new Date().getFullYear()} LID Consulting — Childcare Environmental Performance</div>
-          <div className="flex items-center gap-3">
-            <span>Evidence-first • Parent-friendly</span>
-          </div>
+        <div className="mt-3 text-xs text-slate-500">
+          *Private views may be protected by Basic Auth in middleware. Ask for credentials if prompted.
         </div>
-      </footer>
-    </div>
+      </section>
+    </main>
   );
 }
