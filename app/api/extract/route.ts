@@ -1,13 +1,14 @@
 // app/api/extract/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { createRequire } from "module";
 
-export const runtime = "nodejs";            // pdf-parse requires Node runtime
-export const dynamic = "force-dynamic";     // always run on request
-export const maxDuration = 60;              // headroom for larger PDFs
+export const runtime = "nodejs";           // pdf-parse needs Node, not Edge
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type LoadedFile = { buf: Buffer; type: string; filename: string };
 
-// ---- helpers --------------------------------------------------------------
+// ---------- helpers ---------------------------------------------------------
 
 async function loadFromMultipart(req: NextRequest): Promise<LoadedFile | null> {
   const ct = req.headers.get("content-type") || "";
@@ -33,7 +34,6 @@ async function loadFromMultipart(req: NextRequest): Promise<LoadedFile | null> {
 async function loadFromJson(req: NextRequest): Promise<LoadedFile | null> {
   const ct = req.headers.get("content-type") || "";
   if (!ct.includes("application/json")) return null;
-
   const body = await req.json().catch(() => null) as null | { url?: string };
   if (body?.url) return await loadFromUrl(body.url);
   return null;
@@ -47,16 +47,13 @@ async function loadFromQuery(req: NextRequest): Promise<LoadedFile | null> {
 
 async function loadFromUrl(url: string): Promise<LoadedFile> {
   const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch file (HTTP ${res.status})`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch file (HTTP ${res.status})`);
   const ab = await res.arrayBuffer();
   const type = res.headers.get("content-type") || "application/octet-stream";
   const filename = decodeURIComponent(url.split("/").pop()!.split("?")[0] || "remote-file");
   return { buf: Buffer.from(ab), type, filename };
 }
 
-// very lightweight “key info” grep (you can extend as you like)
 function extractKeyInfo(text: string) {
   const grab = (re: RegExp) => (text.match(re)?.[1] || "").replace(/[, ]/g, "");
   const asNumber = (v: string) => (v ? Number(v) : undefined);
@@ -64,15 +61,15 @@ function extractKeyInfo(text: string) {
   return {
     nmi: text.match(/NMI[:\s-]*([A-Z0-9]{6,})/i)?.[1],
     mirn: text.match(/MIRN[:\s-]*([0-9]{6,})/i)?.[1],
-    electricity_kwh: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*kwh\b/i)),
-    gas_mj: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*mj\b/i)),
-    water_kl: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*k[lL]\b/i)),
-    emissions_tco2e: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*(tco2e|t-co2e)\b/i)),
+    electricity_kwh: asNumber(grab(/([0-9][0-9,.\s]{0,12})\s*kwh\b/i)),
+    gas_mj: asNumber(grab(/([0-9][0-9,.\s]{0,12})\s*mj\b/i)),
+    water_kl: asNumber(grab(/([0-9][0-9,.\s]{0,12})\s*k[lL]\b/i)),
+    emissions_tco2e: asNumber(grab(/([0-9][0-9,.\s]{0,12})\s*(tco2e|t-co2e)\b/i)),
     has_pv: /pv|photovoltaic|inverter/i.test(text),
   };
 }
 
-// ---- route ---------------------------------------------------------------
+// ---------- route -----------------------------------------------------------
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,14 +92,15 @@ export async function POST(req: NextRequest) {
     const lower = filename.toLowerCase();
 
     if (type.includes("pdf") || lower.endsWith(".pdf")) {
-      const pdfParse = (await import("pdf-parse")).default as any;
+      // Require at runtime so Next never bundles pdf-parse (prevents ENOENT)
+      const require = createRequire(import.meta.url);
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pdfParse = require("pdf-parse") as (b: Buffer) => Promise<{ text: string }>;
       const parsed = await pdfParse(buf);
-      text = (parsed?.text || "").slice(0, 200_000); // cap to avoid huge payloads
+      text = (parsed?.text || "").slice(0, 200_000);
     } else if (type.includes("csv") || lower.endsWith(".csv") || type.includes("text")) {
-      // naive CSV/TXT handling
       text = buf.toString("utf8");
     } else {
-      // binary/unknown — just return meta
       return NextResponse.json({
         ok: true,
         meta: { filename, contentType: type, size: buf.length },
@@ -119,10 +117,7 @@ export async function POST(req: NextRequest) {
       keyInfo,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Extraction failed." },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message || "Extraction failed." }, { status: 500 });
   }
 }
 
