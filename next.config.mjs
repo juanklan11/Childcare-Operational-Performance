@@ -1,12 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // keep pdf parsers server-side friendly
-    serverComponentsExternalPackages: ["pdf-parse", "pdfjs-dist"]
+    serverComponentsExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  },
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**" },
+    ],
   },
   typescript: {
-    ignoreBuildErrors: false
-  }
+    ignoreBuildErrors: false,
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
