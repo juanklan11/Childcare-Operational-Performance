@@ -1,10 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // required so the PDF parsers can be bundled server-side without file-system shenanigans
+    // keep pdf parsers server-side friendly
     serverComponentsExternalPackages: ["pdf-parse", "pdfjs-dist"]
   },
-  // keep typechecking on so CI catches real mistakes
   typescript: {
     ignoreBuildErrors: false
   }
