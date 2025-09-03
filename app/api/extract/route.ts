@@ -1,137 +1,132 @@
+// app/api/extract/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs"; // PDF parsing requires Node runtime
+export const runtime = "nodejs";            // pdf-parse requires Node runtime
+export const dynamic = "force-dynamic";     // always run on request
+export const maxDuration = 60;              // headroom for larger PDFs
 
-// simple heuristic fallback (no AI key)
-function quickHeuristic(text: string) {
-  const nmi = text.match(/\bNMI[:\s-]*([A-Z0-9]{10,11})/i)?.[1] || null;
-  const mirn = text.match(/\bMIRN[:\s-]*([0-9]{8,12})/i)?.[1] || null;
-  const pvkw = text.match(/\b(PV|Solar)[^\n]{0,30}(\d{1,3}\.?[\d\/-]?\d*)\s*kW/i)?.[2] || null;
-  const waterKL = text.match(/\bWater[^\n]{0,25}(\d{2,5})\s*kL/i)?.[1] || null;
+type LoadedFile = { buf: Buffer; type: string; filename: string };
 
-  const bullet = [
-    nmi ? `Detected NMI: ${nmi}` : null,
-    mirn ? `Detected MIRN: ${mirn}` : null,
-    pvkw ? `PV size about ${pvkw} kW` : null,
-    waterKL ? `Water ~ ${waterKL} kL (from text)` : null,
-  ].filter(Boolean) as string[];
+// ---- helpers --------------------------------------------------------------
 
-  return { bullet_summary: bullet, fields: { nmi, mirn, pv_kw: pvkw ? Number(pvkw) : null, annual_water_kl_guess: waterKL ? Number(waterKL) : null } };
+async function loadFromMultipart(req: NextRequest): Promise<LoadedFile | null> {
+  const ct = req.headers.get("content-type") || "";
+  if (!ct.includes("multipart/form-data")) return null;
+
+  const form = await req.formData();
+  const file = form.get("file") as File | null;
+  const url = (form.get("url") || form.get("blobUrl"))?.toString();
+
+  if (file) {
+    const ab = await file.arrayBuffer();
+    return {
+      buf: Buffer.from(ab),
+      type: file.type || "application/octet-stream",
+      filename: file.name || "upload",
+    };
+  }
+
+  if (url) return await loadFromUrl(url);
+  return null;
 }
+
+async function loadFromJson(req: NextRequest): Promise<LoadedFile | null> {
+  const ct = req.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return null;
+
+  const body = await req.json().catch(() => null) as null | { url?: string };
+  if (body?.url) return await loadFromUrl(body.url);
+  return null;
+}
+
+async function loadFromQuery(req: NextRequest): Promise<LoadedFile | null> {
+  const url = new URL(req.url).searchParams.get("url");
+  if (!url) return null;
+  return await loadFromUrl(url);
+}
+
+async function loadFromUrl(url: string): Promise<LoadedFile> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch file (HTTP ${res.status})`);
+  }
+  const ab = await res.arrayBuffer();
+  const type = res.headers.get("content-type") || "application/octet-stream";
+  const filename = decodeURIComponent(url.split("/").pop()!.split("?")[0] || "remote-file");
+  return { buf: Buffer.from(ab), type, filename };
+}
+
+// very lightweight “key info” grep (you can extend as you like)
+function extractKeyInfo(text: string) {
+  const grab = (re: RegExp) => (text.match(re)?.[1] || "").replace(/[, ]/g, "");
+  const asNumber = (v: string) => (v ? Number(v) : undefined);
+
+  return {
+    nmi: text.match(/NMI[:\s-]*([A-Z0-9]{6,})/i)?.[1],
+    mirn: text.match(/MIRN[:\s-]*([0-9]{6,})/i)?.[1],
+    electricity_kwh: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*kwh\b/i)),
+    gas_mj: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*mj\b/i)),
+    water_kl: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*k[lL]\b/i)),
+    emissions_tco2e: asNumber(grab(/([0-9][0-9,\. ]{0,12})\s*(tco2e|t-co2e)\b/i)),
+    has_pv: /pv|photovoltaic|inverter/i.test(text),
+  };
+}
+
+// ---- route ---------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, name, contentType } = (await req.json()) as {
-      url: string;
-      name?: string;
-      contentType?: string;
-    };
-    if (!url) return NextResponse.json({ ok: false, error: "Missing file url" }, { status: 400 });
+    // Resolve a file from: multipart, JSON {url}, or ?url=
+    const loaded =
+      (await loadFromMultipart(req)) ||
+      (await loadFromJson(req)) ||
+      (await loadFromQuery(req));
 
-    // fetch file bytes
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Cannot fetch file (${resp.status})`);
-    const ab = await resp.arrayBuffer();
-    const buf = Buffer.from(ab);
+    if (!loaded) {
+      return NextResponse.json(
+        { ok: false, error: "No file provided. Upload a file or pass a ?url= (Blob URL) to this endpoint." },
+        { status: 400 }
+      );
+    }
 
-    const lower = `${name || ""}`.toLowerCase();
-    const type = (contentType || "").toLowerCase();
+    const { buf, type, filename } = loaded;
 
     let text = "";
+    const lower = filename.toLowerCase();
 
     if (type.includes("pdf") || lower.endsWith(".pdf")) {
       const pdfParse = (await import("pdf-parse")).default as any;
       const parsed = await pdfParse(buf);
-      text = (parsed?.text || "").slice(0, 120_000); // cap
-    } else if (type.includes("csv") || lower.endsWith(".csv")) {
-      const { parse } = await import("csv-parse/sync");
-      const rows = parse(buf.toString("utf8"), { columns: true, skip_empty_lines: true });
-      text = JSON.stringify(rows).slice(0, 120_000);
-    } else if (type.startsWith("text/") || lower.endsWith(".txt")) {
-      text = buf.toString("utf8").slice(0, 120_000);
+      text = (parsed?.text || "").slice(0, 200_000); // cap to avoid huge payloads
+    } else if (type.includes("csv") || lower.endsWith(".csv") || type.includes("text")) {
+      // naive CSV/TXT handling
+      text = buf.toString("utf8");
     } else {
-      return NextResponse.json(
-        { ok: false, error: "Unsupported file type. Use PDF, CSV, or TXT." },
-        { status: 415 }
-      );
-    }
-
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    // If no OpenAI API key, return a useful heuristic summary instead
-    if (!apiKey) {
-      const { bullet_summary, fields } = quickHeuristic(text);
+      // binary/unknown — just return meta
       return NextResponse.json({
         ok: true,
-        model: "local-fallback",
-        bullet_summary,
-        fields,
-        rawTextChars: text.length,
+        meta: { filename, contentType: type, size: buf.length },
+        note: "Unsupported file type for text extraction; only PDF/CSV/TXT handled.",
       });
     }
 
-    // OpenAI extraction (JSON mode)
-    const OpenAI = (await import("openai")).default;
-    const client = new OpenAI({ apiKey });
-
-    const system = `
-You are a building performance auditor. Extract structured fields from documents (bills, drawings notes, CSV logs) for Australian childcare centres.
-Return clean JSON with keys:
-{
-  "site_name": string | null,
-  "address": string | null,
-  "nmi": string | null,
-  "mirn": string | null,
-  "billing_months": number | null,
-  "elec_kwh_total_12mo": number | null,
-  "gas_mj_total_12mo": number | null,
-  "water_kl_total_12mo": number | null,
-  "pv_size_kw": number | null,
-  "inverters": string[] | null,
-  "submeters": string[] | null,
-  "rated_area_m2": number | null,
-  "hours": { "open": string | null, "close": string | null } | null,
-  "waste_streams": string[] | null,
-  "ieq_metrics": { "co2_median_ppm": number | null, "co2_95th_ppm": number | null } | null,
-  "risks_or_gaps": string[] | null
-}
-Also return a short "bullet_summary" array describing 4–6 key points for the dashboard. If a field is unknown, set it to null.
-`.trim();
-
-    const user = `
-Source: ${name || "uploaded file"} (${contentType || "unknown"}).
-Extract from the following text (truncated if long):
-
-"""${text}"""
-`.trim();
-
-    const chat = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature: 0.2,
-    });
-
-    const content = chat.choices?.[0]?.message?.content || "{}";
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(content);
-    } catch {}
+    const keyInfo = extractKeyInfo(text);
 
     return NextResponse.json({
       ok: true,
-      model: "gpt-4o-mini",
-      ...parsed,
-      rawTextChars: text.length,
+      meta: { filename, contentType: type, size: buf.length },
+      preview: text.slice(0, 4000),
+      keyInfo,
     });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err?.message || "Extraction error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Extraction failed." },
+      { status: 500 }
+    );
   }
 }
 
-export async function GET() {
-  return NextResponse.json({ ok: true, message: "AI extractor ready" });
+export async function GET(req: NextRequest) {
+  // Support GET /api/extract?url=...
+  return POST(req);
 }
