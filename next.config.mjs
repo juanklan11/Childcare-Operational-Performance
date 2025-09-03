@@ -1,11 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // Keep both external so Next doesn't bundle them (which can break on Vercel)
-    serverComponentsExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+    // required so the PDF parsers can be bundled server-side without file-system shenanigans
+    serverComponentsExternalPackages: ["pdf-parse", "pdfjs-dist"]
   },
-  // Standalone output keeps the server environment predictable for Node libs
-  output: 'standalone',
+  // keep typechecking on so CI catches real mistakes
+  typescript: {
+    ignoreBuildErrors: false
+  }
 };
 
-export default nextConfig;
+module.exports = nextConfig;
