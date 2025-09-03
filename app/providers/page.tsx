@@ -1,152 +1,143 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 
-// Fallback seed (used if /api/providers is not available)
-const seed = [
-  { name: "Goodstart Early Learning", approx_centres: 650, need_score: 3, focus: "Ops, energy", contact: "BD Team", email: "info@goodstart.org.au" },
-  { name: "G8 Education", approx_centres: 430, need_score: 4, focus: "Multi-brand ops", contact: "Corporate", email: "info@g8education.edu.au" },
-  { name: "Affinity Education Group", approx_centres: 225, need_score: 4, focus: "Upgrades program", contact: "Sustainability", email: "contact@affinityeducation.com.au" },
-  { name: "Guardian Childcare & Education", approx_centres: 170, need_score: 3, focus: "ESG & parents", contact: "ESG Lead", email: "info@guardian.edu.au" },
-  { name: "Busy Bees Australia", approx_centres: 150, need_score: 4, focus: "Portfolio rollouts", contact: "Operations", email: "hello@busybees.edu.au" },
-  { name: "Only About Children", approx_centres: 75, need_score: 3, focus: "Brand & wellness", contact: "Property", email: "info@oac.edu.au" },
-  { name: "Story House Early Learning", approx_centres: 60, need_score: 4, focus: "Tuning & metering", contact: "Ops", email: "enquiries@storyhouse.com.au" },
-  { name: "C&K (QLD)", approx_centres: 330, need_score: 2, focus: "Kindergarten network", contact: "Facilities", email: "info@candk.asn.au" },
+type Provider = {
+  name: string;
+  website?: string;
+  centres?: number;         // number of services (size)
+  regions?: string[];
+  audit_need?: "High" | "Medium" | "Low";
+};
+
+const FALLBACK_SEED: Provider[] = [
+  { name: "Goodstart Early Learning", website: "https://www.goodstart.org.au", centres: 640, regions: ["National"], audit_need: "High" },
+  { name: "G8 Education", website: "https://g8education.edu.au", centres: 400, regions: ["National"], audit_need: "High" },
+  { name: "Affinity Education Group", website: "https://affinityeducation.com.au", centres: 220, regions: ["National"], audit_need: "Medium" },
+  { name: "Busy Bees Australia", website: "https://www.busybees.edu.au", centres: 200, regions: ["National"], audit_need: "Medium" },
+  { name: "Guardian Childcare & Education", website: "https://www.guardian.edu.au", centres: 130, regions: ["National"], audit_need: "Medium" },
+  { name: "Only About Children", website: "https://www.oac.edu.au", centres: 70, regions: ["NSW", "VIC", "QLD"], audit_need: "Medium" },
+  { name: "Think Childcare / Nido", website: "https://nido.edu.au", centres: 80, regions: ["National"], audit_need: "Medium" },
 ];
 
-type ProviderRow = typeof seed[number];
+function normalize(input: any): Provider[] {
+  if (!input) return [];
+  if (Array.isArray(input)) return input as Provider[];
+  if (Array.isArray(input.providers)) return input.providers as Provider[];
+  return [];
+}
 
 export default function ProvidersPage() {
-  const [rows, setRows] = React.useState<ProviderRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [rows, setRows] = React.useState<Provider[]>([]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    async function load() {
+    let mounted = true;
+    (async () => {
       try {
+        setLoading(true);
+        setError(null);
         const res = await fetch("/api/providers", { cache: "no-store" });
-        if (!res.ok) throw new Error("API not available");
-        const data = await res.json();
-        const list: ProviderRow[] = (data?.providers || []).map((p: any) => ({
-          name: p.name,
-          approx_centres: p.approx_centres,
-          need_score: p.need_score,
-          focus: p.focus,
-          contact: p.contact,
-          email: p.email,
-        }));
-        if (!cancelled) {
-          setRows(
-            list.length ? list.sort((a, b) => b.approx_centres - a.approx_centres) : seed.sort((a, b) => b.approx_centres - a.approx_centres)
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setRows(seed.sort((a, b) => b.approx_centres - a.approx_centres));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const list = normalize(json);
+
+        if (!mounted) return;
+
+        const safe = list.length ? list : FALLBACK_SEED;
+        // sort by centres desc (size)
+        safe.sort((a, b) => (b.centres || 0) - (a.centres || 0));
+        setRows(safe);
+      } catch (e: any) {
+        // Fallback to seed on any error
+        const seed = [...FALLBACK_SEED].sort((a, b) => (b.centres || 0) - (a.centres || 0));
+        if (mounted) {
+          setRows(seed);
+          setError("Live provider API unavailable — showing seed data.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (mounted) setLoading(false);
       }
-    }
-    load();
+    })();
     return () => {
-      cancelled = true;
+      mounted = false;
     };
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white text-slate-900">
-      {/* Header with logo */}
-      <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src="/lid-logo.svg" alt="LID Consulting" className="h-8 w-auto" />
-            <div>
-              <div className="text-sm font-semibold tracking-tight text-emerald-800">LID Consulting</div>
-              <div className="text-xs text-slate-500">Large Providers — market view</div>
-            </div>
+    <main className="mx-auto max-w-7xl px-6 py-8">
+      <div className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Large Providers</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Sourced from StartingBlocks “Large Providers” (seed), sortable by company size and indicative audit need.
+            </p>
           </div>
-          <nav className="hidden items-center gap-3 md:flex text-sm">
-            <Link href="/" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
-              Home
-            </Link>
-            <Link href="/leads" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
-              Leads
-            </Link>
-          </nav>
+          <div className="text-xs text-slate-500">Admin area</div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-emerald-900">StartingBlocks — Large Providers</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Ordered by approximate number of centres. “Need score” indicates where environmental audits and NEPI ops work are likely most valuable (1–5).
-        </p>
+        {loading && <div className="mt-6 rounded-xl border bg-slate-50 p-4 text-sm">Loading providers…</div>}
+        {error && <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">{error}</div>}
 
-        <div className="mt-4 overflow-x-auto rounded-2xl border bg-white">
+        <div className="mt-4 overflow-x-auto rounded-2xl border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-emerald-50 text-left text-emerald-900">
+              <tr className="bg-slate-50 text-left text-slate-500">
                 <th className="px-4 py-2">Provider</th>
-                <th className="px-4 py-2">~ Centres</th>
-                <th className="px-4 py-2">Need score</th>
-                <th className="px-4 py-2">Focus</th>
-                <th className="px-4 py-2">Contact</th>
-                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Website</th>
+                <th className="px-4 py-2">Centres</th>
+                <th className="px-4 py-2">Regions</th>
+                <th className="px-4 py-2">Audit need</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                    Loading…
+              {rows.map((r, i) => (
+                <tr key={(r.name || "p") + i} className="border-t">
+                  <td className="px-4 py-2 font-medium text-slate-800">{r.name || "—"}</td>
+                  <td className="px-4 py-2">
+                    {r.website ? (
+                      <a href={r.website} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                        {new URL(r.website).hostname.replace("www.", "")}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-4 py-2">{typeof r.centres === "number" ? r.centres.toLocaleString() : "—"}</td>
+                  <td className="px-4 py-2">{Array.isArray(r.regions) ? r.regions.join(", ") : "—"}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={
+                        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs " +
+                        (r.audit_need === "High"
+                          ? "border-red-300 bg-red-100 text-red-700"
+                          : r.audit_need === "Medium"
+                          ? "border-amber-300 bg-amber-100 text-amber-700"
+                          : "border-emerald-300 bg-emerald-100 text-emerald-700")
+                      }
+                    >
+                      {r.audit_need || "—"}
+                    </span>
                   </td>
                 </tr>
-              ) : rows.length === 0 ? (
+              ))}
+              {!rows.length && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
                     No providers found.
                   </td>
                 </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.name} className="border-t">
-                    <td className="px-4 py-2 font-medium text-slate-800">{r.name}</td>
-                    <td className="px-4 py-2">{r.approx_centres.toLocaleString()}</td>
-                    <td className="px-4 py-2">{r.need_score}/5</td>
-                    <td className="px-4 py-2">{r.focus}</td>
-                    <td className="px-4 py-2">{r.contact}</td>
-                    <td className="px-4 py-2">
-                      {r.email ? (
-                        <a className="text-emerald-700 underline" href={`mailto:${r.email}`}>
-                          {r.email}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))
               )}
             </tbody>
           </table>
         </div>
 
-        <div className="mt-2 text-[11px] italic text-slate-500">
-          Source: StartingBlocks “Large Providers” (curated); counts indicative. Replace with live scrape/API when ready.
+        <div className="mt-3 text-[11px] italic text-slate-500">
+          For lead-gen, pair with your /leads page and CSV/API ingestion. Data shown here is non-confidential.
         </div>
-      </main>
-
-      <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs text-slate-500">
-        <div className="flex items-center justify-between border-t pt-4">
-          <div>© {new Date().getFullYear()} LID Consulting — Market view</div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
-            <span>Emerald brand</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
