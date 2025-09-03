@@ -1,130 +1,120 @@
-"use client";
-
 import Image from "next/image";
-import React from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+export const metadata = {
+  title: "Auditor Workspace — NEPI Methodology",
+  description: "Audit methodology and document register feeding the sustainability dashboard.",
+};
 
 export default function AuditorPage() {
-  const [tab, setTab] = React.useState("method");
-
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      {/* Simple brand row (no event handlers in props) */}
-      <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Image src="/lid-logo.svg" alt="LID Consulting" width={36} height={36} className="h-9 w-9" />
-          <div>
-            <div className="text-sm font-semibold tracking-tight">Auditor Workspace</div>
-            <div className="text-xs text-slate-500">NEPI methodology & required documentation</div>
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo-lid.svg"
+              alt="LID Consulting"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+              priority
+            />
+            <div>
+              <div className="text-sm font-semibold tracking-tight">Auditor Workspace</div>
+              <div className="text-xs text-slate-500">NEPI Audit &amp; Evidence</div>
+            </div>
           </div>
+          <div className="text-xs text-slate-500">Private area • Basic Auth</div>
         </div>
-        <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700">
-          Private
-        </span>
       </header>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="method">Methodology</TabsTrigger>
-          <TabsTrigger value="docs">Required Documentation</TabsTrigger>
-          <TabsTrigger value="dashboard">Data → Dashboard Mapping</TabsTrigger>
-        </TabsList>
+      {/* Body */}
+      <section className="mx-auto max-w-6xl px-6 py-8">
+        <div className="rounded-3xl border bg-white p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold tracking-tight">Audit Methodology</h1>
+          <p className="mt-2 text-slate-600">
+            This methodology is aligned to the NABERS Energy Performance Indicator (Childcare) “The Rules” (v1.3). It
+            defines evidence sufficiency, operating boundary, and intake workflow to produce audit-ready KPIs for the
+            client dashboard and public snapshot.
+          </p>
 
-        <TabsContent value="method">
-          <section className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight">Audit methodology</h2>
-            <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-slate-700">
-              <li>Confirm site boundary, rated area method, and operating hours (20%/80% markers).</li>
-              <li>Collect 12 months of bills for electricity, gas/diesel (if any), and water.</li>
-              <li>Verify meters (NMI/MIRN), sub-meter coverage, and PV inverter logs where applicable.</li>
-              <li>Capture waste stream invoices & lifts; note contamination and service frequency.</li>
-              <li>Record IEQ measurements (e.g., CO₂ steady-state & 95th percentile per room).</li>
-              <li>Evidence chain: drawings, schedules, contracts, calculations, and photos as needed.</li>
-            </ol>
-            <p className="mt-3 text-xs text-slate-500">Aligned to NABERS Energy Performance Indicator (Childcare) — The Rules v1.3.</p>
-          </section>
-        </TabsContent>
-
-        <TabsContent value="docs">
-          <section className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight">Required documentation</h2>
-            <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border p-4">
-                <div className="text-sm font-medium">Energy</div>
-                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
-                  <li>Electricity &amp; gas/diesel bills (12 months)</li>
-                  <li>PV generation report or inverter export</li>
-                  <li>Sub-meter list and data source</li>
-                </ul>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="text-sm font-medium">Water</div>
-                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
-                  <li>Potable &amp; recycled water bills (12 months)</li>
-                  <li>Reticulation diagram &amp; non-utility meters</li>
-                </ul>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="text-sm font-medium">Waste</div>
-                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
-                  <li>Invoices per stream and service frequency</li>
-                  <li>Contamination notes &amp; photos (if any)</li>
-                </ul>
-              </div>
-              <div className="rounded-xl border p-4">
-                <div className="text-sm font-medium">IEQ</div>
-                <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
-                  <li>CO₂ by room — median &amp; 95th percentile</li>
-                  <li>Ventilation/controls strategy notes</li>
-                </ul>
-              </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="text-sm font-medium">1) Scope &amp; Boundaries</div>
+              <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
+                <li>Rated area basis (GFA/GLA/GLAR/NLA) and method of measurement.</li>
+                <li>Energy boundary (HVAC, kitchens, specialised loads).</li>
+                <li>Operating hours and occupancy markers (20%/80%).</li>
+              </ul>
             </div>
-          </section>
-        </TabsContent>
-
-        <TabsContent value="dashboard">
-          <section className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold tracking-tight">Dashboard mapping</h2>
-            <p className="mt-2 text-sm text-slate-700">
-              Auditors’ uploads feed structured collections that drive the private client dashboard and the public
-              parent snapshot. When evidence is marked <em>Complete</em>, KPIs update automatically.
-            </p>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500">
-                    <th className="py-2 pr-4">Collection</th>
-                    <th className="py-2 pr-4">Fields</th>
-                    <th className="py-2 pr-4">Populates</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t">
-                    <td className="py-2 pr-4 font-medium">Energy bills</td>
-                    <td className="py-2 pr-4">period, kWh, MJ, cost, NMI/MIRN</td>
-                    <td className="py-2 pr-4">Energy charts &amp; annual totals</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 pr-4 font-medium">Water bills</td>
-                    <td className="py-2 pr-4">period, kL, cost, meter</td>
-                    <td className="py-2 pr-4">Water chart &amp; annual total</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 pr-4 font-medium">Waste</td>
-                    <td className="py-2 pr-4">stream, kg, lifts, contamination</td>
-                    <td className="py-2 pr-4">Waste chart &amp; recycling rate</td>
-                  </tr>
-                  <tr className="border-t">
-                    <td className="py-2 pr-4 font-medium">IEQ (CO₂)</td>
-                    <td className="py-2 pr-4">room, median, p95</td>
-                    <td className="py-2 pr-4">IEQ room chart • targets</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="text-sm font-medium">2) Evidence Intake</div>
+              <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
+                <li>12 months of electricity, gas, water bills.</li>
+                <li>PV inverter data (if installed) and non-utility meters.</li>
+                <li>Drawings, single-lines, reticulation diagrams.</li>
+              </ul>
             </div>
-          </section>
-        </TabsContent>
-      </Tabs>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="text-sm font-medium">3) Validation &amp; QA</div>
+              <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
+                <li>NMI/MIRN cross-check, bill coverage, gaps register.</li>
+                <li>Spot checks: IEQ (CO₂), waste stream consistency.</li>
+                <li>Peer review and client sign-off trail.</li>
+              </ul>
+            </div>
+          </div>
+
+          <h2 className="mt-8 text-xl font-semibold tracking-tight">Required Documentation</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Uploads here feed the private dashboard and public snapshot automatically once verified.
+          </p>
+
+          <div className="mt-4 overflow-x-auto rounded-2xl border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-slate-500">
+                  <th className="px-4 py-2">Category</th>
+                  <th className="px-4 py-2">Item</th>
+                  <th className="px-4 py-2">Files</th>
+                  <th className="px-4 py-2">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { cat: "Areas", item: "Rated area basis & method", files: "PDF/DWG", note: "BOMA/lettable/GFA" },
+                  { cat: "Hours", item: "Operating hours & 20/80 markers", files: "Roster / logs", note: "Term/calendar" },
+                  { cat: "Energy", item: "Electricity bills (12 mo)", files: "PDF", note: "NMI coverage check" },
+                  { cat: "Energy", item: "Gas bills (12 mo)", files: "PDF", note: "MIRN coverage check" },
+                  { cat: "Energy", item: "PV generation logs", files: "CSV/portal export", note: "kWh by month" },
+                  { cat: "Water", item: "Water bills (12 mo)", files: "PDF", note: "Meter no. validation" },
+                  { cat: "Waste", item: "Waste invoices & streams", files: "PDF", note: "Contamination fees" },
+                  { cat: "IEQ", item: "CO₂ readings per room", files: "CSV", note: "< 800 ppm steady-state" },
+                ].map((r, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-4 py-2 font-medium text-slate-800">{r.cat}</td>
+                    <td className="px-4 py-2">{r.item}</td>
+                    <td className="px-4 py-2">{r.files}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3 text-[11px] italic text-slate-500">
+            After validation, metrics roll into the sustainability dashboard and the parent snapshot.
+          </div>
+        </div>
+      </section>
+
+      <footer className="mx-auto max-w-6xl px-6 pb-10 pt-6 text-xs text-slate-500">
+        <div className="flex flex-col items-start justify-between gap-3 border-t pt-4 md:flex-row md:items-center">
+          <div>© {new Date().getFullYear()} LID Consulting — Auditor Workspace</div>
+          <div>NEPI-aligned • Evidence-first</div>
+        </div>
+      </footer>
     </main>
   );
 }
