@@ -1,73 +1,38 @@
+// app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
-// Run on the Edge for fast, cheap uploads
-export const runtime = "edge";
-
-function sanitizeName(name: string) {
-  return name.replace(/[^a-z0-9.\-_\s]/gi, "_");
-}
+export const runtime = "nodejs"; // must be nodejs, not edge
 
 export async function POST(req: NextRequest) {
   try {
-    // Accept multipart/form-data with one or many files under field name "files"
-    const form = await req.formData();
-    const files = form.getAll("files") as File[];
-
-    if (!files || files.length === 0) {
-      return NextResponse.json({ error: "No files received" }, { status: 400 });
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return NextResponse.json({ ok: false, error: "No file provided" }, { status: 400 });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const token = process.env.BLOB_READ_WRITE_TOKEN; // optional on Vercel; used locally if set
+    const bytes = Buffer.from(await file.arrayBuffer());
 
-    const uploaded: Array<{
-      url: string;
-      pathname: string;
-      size: number;
-      contentType: string;
-      originalName: string;
-    }> = [];
+    // ✅ Save inside /public/uploads so it's accessible
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    await mkdir(uploadDir, { recursive: true });
 
-    for (const file of files) {
-      // Basic guardrails (50 MB default per file – adjust as needed)
-      const MAX_BYTES = 50 * 1024 * 1024;
-      if (file.size > MAX_BYTES) {
-        return NextResponse.json(
-          { error: `File ${file.name} exceeds 50MB limit` },
-          { status: 413 }
-        );
-      }
+    const filePath = path.join(uploadDir, file.name);
+    await writeFile(filePath, bytes);
 
-      const safeName = sanitizeName(file.name);
-      const key = `audits/${today}/${crypto.randomUUID()}-${safeName}`;
+    // Public URL (Next.js serves /public/* at root)
+    const fileUrl = `/uploads/${encodeURIComponent(file.name)}`;
 
-      // Upload to Vercel Blob (public access so you can preview images/PDFs)
-      const blob = await put(key, file, {
-        access: "public",
-        contentType: file.type || "application/octet-stream",
-        token
-      });
-
-      uploaded.push({
-        url: blob.url,
-        pathname: blob.pathname,
-        size: file.size,
-        contentType: file.type || "application/octet-stream",
-        originalName: file.name
-      });
-    }
-
-    return NextResponse.json({ ok: true, uploaded }, { status: 200 });
+    return NextResponse.json({
+      ok: true,
+      fileUrl,
+      meta: { filename: file.name, size: bytes.length, type: file.type },
+      message: "Upload successful",
+    });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message ?? "Upload failed" },
-      { status: 500 }
-    );
+    console.error("Upload error:", err);
+    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
-}
-
-// Optional: allow a quick GET health check
-export async function GET() {
-  return NextResponse.json({ ok: true, message: "Upload endpoint ready" });
 }
